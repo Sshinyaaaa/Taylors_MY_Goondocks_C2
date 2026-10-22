@@ -3,7 +3,7 @@ import { useTideCloak } from "@tidecloak/react";
 import OrbitView from "./OrbitView";
 import {
   api, approveCR, CONSOLE_URL, decryptTrajectory, encryptOwnTrajectory, explainTideError, findAssessorCR, getCR,
-  mockAssessment, RECORDS, requestAssessorGrant, signAllPolicies, ASSESSOR_ROLE,
+  mockAssessment, RECORDS, requestAssessorGrant, requestAssessorRevoke, signAllPolicies, ASSESSOR_ROLE,
   type ChangeRequest, type SecureFetch, type ApproveTideRequests,
 } from "./lib/blindorbit";
 
@@ -40,7 +40,10 @@ export default function Console() {
     try { setState(await api<State>(sf, "/api/state")); } catch (e) { add("deny", `state: ${explainTideError(e)}`); }
     try {
       const found = crId ? await getCR(sf, crId) : await findAssessorCR(sf);
-      if (found) { setCr(found); if (!crId) { setCrId(found.id); localStorage.setItem("bo.crId", found.id); } }
+      // A committed revoke means the demo is back at the start.
+      if (found && found.actionType !== "GRANT_ROLES" && found.status === "APPROVED") {
+        localStorage.removeItem("bo.crId"); setCrId(null); setCr(null);
+      } else if (found) { setCr(found); if (!crId) { setCrId(found.id); localStorage.setItem("bo.crId", found.id); } }
     } catch { /* not every user can read the change-request list */ }
   }, [sf, crId, add]);
 
@@ -95,6 +98,15 @@ export default function Console() {
     add("ok", `Assessment complete: ${m.result}`);
   });
 
+  const resetDemo = () => run("Reset demo", async () => {
+    await api(sf, "/api/reset-assessment", { method: "POST" });
+    localStorage.removeItem("bo.crId"); setCrId(null); setCr(null); setRadar(false);
+    const r = await requestAssessorRevoke(sf);
+    add("tide", `Revoke conjunction-assessor → HTTP ${r.status}${r.status === 202 ? " (change request: needs the same quorum — approve it twice)" : ""}`);
+    const id = r.location?.split("/").pop();
+    if (id) { setCrId(id); localStorage.setItem("bo.crId", id); }
+  });
+
   const adminRead = () => run("Platform Admin read", async () => {
     add("info", `${user} requests the USA-326 assessor policy and asks the ORKs to decrypt…`);
     try {
@@ -116,7 +128,8 @@ export default function Console() {
   const haveBoth = !!t[RECORDS.usa326] && !!t[RECORDS.starlink];
   const policiesReady = Object.keys(state?.policies ?? {}).length >= 4;
   const approvals = cr?.authorizationCount ?? cr?.authorizers?.length;
-  const committed = cr?.status === "APPROVED";
+  const isRevoke = !!cr && cr.actionType !== "GRANT_ROLES";
+  const committed = cr?.status === "APPROVED" && !isRevoke;
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-200">
@@ -141,6 +154,12 @@ export default function Console() {
 
           <div className="border border-zinc-800 rounded-lg p-4 bg-zinc-900/40">
             <h2 className="font-mono text-xs tracking-widest text-zinc-400 mb-3">WORKFLOW</h2>
+            {isRevoke && (
+              <div className="mb-3 rounded border border-amber-700 bg-amber-950/30 p-2 font-mono text-xs text-amber-300 flex flex-wrap items-center gap-2">
+                Demo reset pending: revoking conjunction-assessor needs the same quorum ({cr?.authorizationCount ?? 0}/{cr?.threshold ?? "?"}).
+                <Btn onClick={approve} busy={busy}>Approve revoke as {user}</Btn>
+              </div>
+            )}
             <ol className="space-y-2 text-sm">
               <Step n={0} done={policiesReady} title="Record policies signed by the ORK network (one-time, DoD admin)">
                 {isDod && !policiesReady && <Btn onClick={setup} busy={busy}>Sign 4 record policies</Btn>}
@@ -153,7 +172,7 @@ export default function Console() {
                 {(radar || cr) && !cr && <Btn onClick={requestGrant} busy={busy}>Request conjunction assessment</Btn>}
               </Step>
               <Step n={3} done={!!cr && (approvals ?? 0) >= 1} title={`Operators approve in the Tide enclave ${cr ? `— ${approvals ?? "?"}/${cr.threshold ?? "?"} approvals${cr.authorizers?.length ? ` (${cr.authorizers.map((a) => a.username).join(", ")})` : ""}` : ""}`}>
-                {cr && !committed && <Btn onClick={approve} busy={busy}>Approve as {user}</Btn>}
+                {cr && !committed && !isRevoke && <Btn onClick={approve} busy={busy}>Approve as {user}</Btn>}
                 {cr && <a href={CONSOLE_URL} target="_blank" className="text-xs text-zinc-500 underline ml-2">open in TideCloak console</a>}
               </Step>
               <Step n={4} done={committed} title="Authority emerges: conjunction-assessor granted by quorum" />
@@ -180,6 +199,14 @@ export default function Console() {
             </div>
             {!isAdm && <p className="text-xs text-zinc-500 mt-2 font-mono">Sign in as platform-admin to run this as the admin. Any non-assessor gets the same refusal.</p>}
           </div>
+
+          {committed && cr?.actionType === "GRANT_ROLES" && (
+            <div className="text-right">
+              <button onClick={resetDemo} disabled={!!busy} className="font-mono text-[11px] text-zinc-500 hover:text-zinc-300 underline disabled:opacity-40">
+                reset demo (files a governed revoke)
+              </button>
+            </div>
+          )}
         </section>
 
         <aside className="space-y-4 min-w-0">

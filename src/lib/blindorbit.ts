@@ -123,6 +123,14 @@ export async function requestAssessorGrant(sf: SecureFetch, grantee = "commercia
   return { status: r.status, location: r.location, body: r.body };
 }
 
+/** Demo reset: revoking the role is itself a governed change request needing the same quorum. */
+export async function requestAssessorRevoke(sf: SecureFetch, grantee = "commercial-operator") {
+  const role = await tide(sf, `/roles/${ASSESSOR_ROLE}`);
+  if (!role.ok) throw new Error(`role lookup failed (${role.status})`);
+  const r = await tide(sf, `/users/${await userId(sf, grantee)}/role-mappings/realm`, { method: "DELETE", body: JSON.stringify([role.body]) });
+  return { status: r.status, location: r.location, body: r.body };
+}
+
 export async function findAssessorCR(sf: SecureFetch): Promise<ChangeRequest | null> {
   const r = await tide(sf, `/iga/change-requests?status=PENDING`);
   if (!r.ok || !Array.isArray(r.body)) return null;

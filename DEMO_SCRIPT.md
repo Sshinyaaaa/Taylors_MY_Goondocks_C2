@@ -14,4 +14,8 @@
 | 1:35 | COM window: **Run conjunction assessment** | "Both trajectories are decrypted only in this operator's browser. The manoeuvre comes back: a 0.38 m/s prograde burn at T-6h, and the miss distance becomes 18.2 km." |
 | 1:50 | DoD window: show the result line | "The DoD side sees that the assessment was delivered, but not Starlink's plan. Zero master keys. Authority emerged only when both operators approved." |
 
+**Resetting for another run:** after a full run, click **reset demo (files a governed revoke)** under the admin panel. Removing `conjunction-assessor` is itself a change request, so approve the amber "Approve revoke" prompt as dod-operator and then as commercial-operator. When it commits, the workflow returns to step 2, and the encrypted trajectories and signed policies stay in place. Do this *before* going live.
+
+**If the role doesn't take effect right after the second approval:** TideCloak can take up to about 2 minutes to put the new role into the token. If **Run conjunction assessment** is refused, log out and back in as commercial-operator. Fill that time by talking about the side panel.
+
 **If the enclave popup doesn't appear:** allow popups for localhost:5173. As a fallback, approve the change request in the TideCloak console (the "open in TideCloak console" link next to the Approve button).
