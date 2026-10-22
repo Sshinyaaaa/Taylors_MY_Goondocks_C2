@@ -8,7 +8,8 @@
     "web": "vite",
     "api": "tsx server/index.ts",
     "build": "tsc --noEmit && vite build",
-    "bootstrap": "node scripts/bootstrap.mjs"
+    "bootstrap": "node scripts/bootstrap.mjs",
+    "zip": "node scripts/make-zip.mjs"
   },
   "dependencies": {
     "@tidecloak/js": "0.14.41",

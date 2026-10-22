@@ -70,7 +70,10 @@ export default function OrbitView() {
   return (
     <div className="relative border border-zinc-800 rounded-lg bg-black overflow-hidden">
       <canvas ref={ref} className="w-full h-[320px] block" />
-      <div className="absolute top-3 left-3 font-mono text-xs text-zinc-400">ORBIT VIEW · ECI (mock)</div>
+      <div className="absolute top-3 left-3 font-mono text-xs text-zinc-400 flex items-center gap-2">
+        ORBIT VIEW · ECI
+        <span className="font-mono text-[9px] tracking-wider px-1.5 py-0.5 rounded border border-violet-500/70 text-violet-300 bg-violet-950/40">SIMULATED RADAR &amp; ORBITS</span>
+      </div>
       <div className="absolute top-3 right-3 font-mono text-right">
         <div className="text-[10px] text-zinc-500">TIME TO CLOSEST APPROACH</div>
         <div className="text-lg text-red-400">TCA T-{hh}h {String(mm).padStart(2, "0")}m <span className="text-xs text-red-500/70">{String(ss).padStart(2, "0")}s</span></div>

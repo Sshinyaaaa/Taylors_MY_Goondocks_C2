@@ -88,7 +88,13 @@ export default function Console() {
     add("info", "Refreshing token so the credential carries any newly granted role…");
     await tc.forceRefreshToken();
     add("tide", "Asking the ORK network to decrypt USA-326 under policy usa326-assessor…");
-    const a = await decryptTrajectory(sf, RECORDS.usa326, "usa326-assessor", state!.trajectories[RECORDS.usa326].ciphertext);
+    let a;
+    try {
+      a = await decryptTrajectory(sf, RECORDS.usa326, "usa326-assessor", state!.trajectories[RECORDS.usa326].ciphertext);
+    } catch (e) {
+      add("deny", `REJECTED by the Tide network: authority has not emerged (quorum not met, or role not yet in token): ${explainTideError(e)}`);
+      return;
+    }
     add("ok", "USA-326 decrypted (in this browser only).");
     add("tide", "Asking the ORK network to decrypt Starlink-4921 under policy starlink-assessor…");
     const b = await decryptTrajectory(sf, RECORDS.starlink, "starlink-assessor", state!.trajectories[RECORDS.starlink].ciphertext);
@@ -167,21 +173,23 @@ export default function Console() {
               <Step n={1} done={haveBoth} title="Both trajectories stored as ENCRYPTED blobs">
                 {(isDod || isCom) && policiesReady && <Btn onClick={encryptMine} busy={busy}>Encrypt my trajectory</Btn>}
               </Step>
-              <Step n={2} done={radar || !!cr} title="Radar alert: predicted miss distance 2.4 km">
+              <Step n={2} done={radar || !!cr} title="Radar alert: predicted miss distance 2.4 km" badge="sim">
                 {!radar && !cr && <Btn onClick={() => { setRadar(true); add("info", "RADAR: USA-326 × Starlink-4921, predicted miss 2.4 km, TCA T-18h 42m"); }} busy={busy}>Inject radar alert</Btn>}
                 {(radar || cr) && !cr && <Btn onClick={requestGrant} busy={busy}>Request conjunction assessment</Btn>}
               </Step>
-              <Step n={3} done={!!cr && (approvals ?? 0) >= 1} title={`Operators approve in the Tide enclave ${cr ? `— ${approvals ?? "?"}/${cr.threshold ?? "?"} approvals${cr.authorizers?.length ? ` (${cr.authorizers.map((a) => a.username).join(", ")})` : ""}` : ""}`}>
+              <Step n={3} done={!!cr && (approvals ?? 0) >= 1} title={`Operators approve in the Tide enclave ${cr ? `— ${approvals ?? "?"}/${cr.threshold ?? "?"} approvals${cr.authorizers?.length ? ` (${cr.authorizers.map((a) => a.username).join(", ")})` : ""}` : ""}`} badge="real">
                 {cr && !committed && !isRevoke && <Btn onClick={approve} busy={busy}>Approve as {user}</Btn>}
                 {cr && <a href={CONSOLE_URL} target="_blank" className="text-xs text-zinc-500 underline ml-2">open in TideCloak console</a>}
               </Step>
-              <Step n={4} done={committed} title="Authority emerges: conjunction-assessor granted by quorum" />
-              <Step n={5} done={!!state?.assessment} title="Maneuver computed, delivered only to the operator who must act">
-                {isCom && committed && haveBoth && !state?.assessment && <Btn onClick={runAssessment} busy={busy}>Run conjunction assessment</Btn>}
+              <Step n={4} done={committed} title="Authority emerges: conjunction-assessor granted by quorum" badge="real" />
+              <Step n={5} done={!!state?.assessment} title="Maneuver computed, delivered only to the operator who must act" badge="sim">
+                {/* Available before quorum on purpose: one operator alone is refused by the ORKs. */}
+                {isCom && haveBoth && !state?.assessment && <Btn onClick={runAssessment} busy={busy}>Run conjunction assessment</Btn>}
               </Step>
             </ol>
             {state?.assessment && (
               <div className="mt-4 rounded border border-emerald-700 bg-emerald-950/40 p-3 font-mono text-sm">
+                <Badge kind="sim" label="SIMULATED maneuver calculation" />{" "}
                 {state.assessment.result
                   ? <span className="text-emerald-300">{state.assessment.result}</span>
                   : <span className="text-zinc-400">Assessment delivered to {state.assessment.deliveredTo} at {state.assessment.at}. Not visible to {user}.</span>}
@@ -239,11 +247,18 @@ function Btn({ children, onClick, busy, danger, disabled }: { children: React.Re
   );
 }
 
-function Step({ n, done, title, children }: { n: number; done: boolean; title: string; children?: React.ReactNode }) {
+export function Badge({ kind, label }: { kind: "sim" | "real"; label?: string }) {
+  return kind === "sim"
+    ? <span className="inline-block font-mono text-[9px] tracking-wider px-1.5 py-0.5 rounded border border-violet-500/70 text-violet-300 bg-violet-950/40">{label ?? "SIMULATED"}</span>
+    : <span className="inline-block font-mono text-[9px] tracking-wider px-1.5 py-0.5 rounded border border-emerald-600/70 text-emerald-300 bg-emerald-950/40">{label ?? "REAL · TIDECLOAK"}</span>;
+}
+
+function Step({ n, done, title, badge, children }: { n: number; done: boolean; title: string; badge?: "sim" | "real"; children?: React.ReactNode }) {
   return (
     <li className="flex flex-wrap items-center gap-3">
       <span className={`font-mono text-xs w-6 h-6 grid place-items-center rounded-full border ${done ? "border-emerald-500 text-emerald-400" : "border-zinc-700 text-zinc-500"}`}>{done ? "✓" : n}</span>
       <span className={done ? "text-zinc-200" : "text-zinc-400"}>{title}</span>
+      {badge && <Badge kind={badge} />}
       {children}
     </li>
   );
@@ -252,7 +267,11 @@ function Step({ n, done, title, children }: { n: number; done: boolean; title: s
 function Blob({ title, color, rec }: { title: string; color: "amber" | "cyan"; rec?: { ciphertext: string; updatedAt: string } }) {
   return (
     <div className="border border-zinc-800 rounded-lg p-3 bg-zinc-900/40 min-w-0">
-      <div className={`font-mono text-xs ${color === "amber" ? "text-amber-400" : "text-cyan-400"}`}>{title}</div>
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className={`font-mono text-xs mr-auto ${color === "amber" ? "text-amber-400" : "text-cyan-400"}`}>{title}</span>
+        <Badge kind="sim" label="SIMULATED TRAJECTORY" />
+        <Badge kind="real" label="REAL ENCRYPTION" />
+      </div>
       <div className="font-mono text-[10px] text-zinc-500 mt-2 break-all h-16 overflow-hidden">
         {rec ? rec.ciphertext.slice(0, 260) : "— not yet submitted —"}
       </div>
