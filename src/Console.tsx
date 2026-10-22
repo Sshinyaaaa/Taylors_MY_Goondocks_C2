@@ -151,7 +151,7 @@ export default function Console() {
 
       <main className="grid gap-4 p-4 sm:p-6 lg:grid-cols-[1fr_380px]">
         <section className="space-y-4 min-w-0">
-          <OrbitView />
+          <OrbitView dodIngested={!!t[RECORDS.usa326]} starlinkIngested={!!t[RECORDS.starlink]} resolved={!!state?.assessment} />
 
           <div className="grid gap-4 md:grid-cols-2">
             <Blob title="USA-326 (Classified DoD)" color="amber" rec={t[RECORDS.usa326]} />
