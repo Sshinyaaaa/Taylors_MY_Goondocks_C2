@@ -142,7 +142,7 @@ In the UI, **green badges** mark real TideCloak operations and **violet badges**
 ### 1. Clone and install
 
 ```bash
-git clone https://github.com/Sshinyaaaa/rmit-claude-challenge-2.git blindorbit
+git clone <this-repository-url> blindorbit
 cd blindorbit
 npm install
 ```
